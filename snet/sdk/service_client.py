@@ -117,15 +117,19 @@ class ServiceClient:
 
         return new_channels_to_be_added
 
-    def load_open_channels(self):
+    def load_open_channels(self, from_mpe=False):
         current_block_number = self.sdk_web3.eth.block_number
         payment_address = self.group["payment"]["payment_address"]
         group_id = base64.b64decode(str(self.group["group_id"]))
-        new_payment_channels = self.payment_channel_provider.get_past_open_channels(self.account, payment_address,
-                                                                                    group_id, self.last_read_block)
-        self.payment_channels = self.payment_channels + \
-                                self._filter_existing_channels_from_new_payment_channels(new_payment_channels)
-        self.last_read_block = current_block_number
+        if from_mpe:
+            self.payment_channels = self.payment_channel_provider.get_open_channels(self.account, payment_address,
+                                                                                    group_id)
+        else:
+            new_payment_channels = self.payment_channel_provider.get_past_open_channels(self.account, payment_address,
+                                                                                        group_id, self.last_read_block)
+            self.payment_channels = self.payment_channels + \
+                                    self._filter_existing_channels_from_new_payment_channels(new_payment_channels)
+            self.last_read_block = current_block_number
         return self.payment_channels
 
     def get_current_block_number(self):
@@ -146,17 +150,17 @@ class ServiceClient:
             state_service_pb2_grpc = importlib.import_module("state_service_pb2_grpc")
         return state_service_pb2_grpc.PaymentChannelStateServiceStub(grpc_channel)
 
-    def open_channel(self, amount, expiration):
+    def open_channel(self, amount, expiration, from_mpe=False):
         payment_address = self.group["payment"]["payment_address"]
         group_id = base64.b64decode(str(self.group["group_id"]))
         return self.payment_channel_provider.open_channel(self.account, amount, expiration, payment_address,
-                                                          group_id)
+                                                          group_id, from_mpe)
 
-    def deposit_and_open_channel(self, amount, expiration):
+    def deposit_and_open_channel(self, amount, expiration, from_mpe=False):
         payment_address = self.group["payment"]["payment_address"]
         group_id = base64.b64decode(str(self.group["group_id"]))
         return self.payment_channel_provider.deposit_and_open_channel(self.account, amount, expiration,
-                                                                      payment_address, group_id)
+                                                                      payment_address, group_id, from_mpe)
 
     def get_price(self):
         return self.group["pricing"][0]["price_in_cogs"]

@@ -45,3 +45,9 @@ class MPEContract:
         current_escrow_balance = self.balance(account.address)
         if amount > current_escrow_balance:
             account.deposit_to_escrow_account(amount - current_escrow_balance)
+
+    def next_channel_id(self):
+        return self.contract.functions.nextChannelId().call()
+
+    def channels(self, channel_id):
+        return self.contract.functions.channels(channel_id).call()

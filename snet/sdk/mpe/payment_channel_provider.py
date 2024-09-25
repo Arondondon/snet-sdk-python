@@ -18,6 +18,34 @@ class PaymentChannelProvider(object):
         self.deployment_block = get_contract_deployment_block(self.web3, "MultiPartyEscrow")
         self.payment_channel_state_service_client = payment_channel_state_service_client
 
+    def get_open_channels(self, account, payment_address, group_id):
+        last_channel_id = self.mpe_contract.next_channel_id() - 1
+
+        channels = []
+        for channel_id in range(last_channel_id, -1, -1):
+            channel_data = self.mpe_contract.channels(channel_id)
+
+            if ((channel_data[1] == account.address or channel_data[2] == account.signer_address) and
+                    channel_data[3] == payment_address and channel_data[4] == group_id):
+                channels.append(PaymentChannel(channel_id,
+                                               self.web3,
+                                               account,
+                                               self.payment_channel_state_service_client,
+                                               self.mpe_contract))
+        return channels
+
+    def get_last_open_channel(self, account, payment_address, group_id):
+        last_channel_id = self.mpe_contract.next_channel_id() - 1
+        for channel_id in range(last_channel_id, -1, -1):
+            channel_data = self.mpe_contract.channels(channel_id)
+            if ((channel_data[1] == account.address or channel_data[2] == account.signer_address) and
+                    channel_data[3] == payment_address and channel_data[4] == group_id):
+                return PaymentChannel(channel_id,
+                                      self.web3,
+                                      account,
+                                      self.payment_channel_state_service_client,
+                                      self.mpe_contract)
+
     def get_past_open_channels(self, account, payment_address, group_id, starting_block_number=0, to_block_number=None):
         if to_block_number is None:
             to_block_number = self.web3.eth.block_number
@@ -48,15 +76,22 @@ class PaymentChannelProvider(object):
                                                        self.payment_channel_state_service_client, self.mpe_contract),
                         channels_opened))
 
-    def open_channel(self, account, amount, expiration, payment_address, group_id):
+    def open_channel(self, account, amount, expiration, payment_address, group_id, from_mpe=False):
 
         receipt = self.mpe_contract.open_channel(account, payment_address, group_id, amount, expiration)
-        return self._get_newly_opened_channel(receipt, account, payment_address, group_id)
 
-    def deposit_and_open_channel(self, account, amount, expiration, payment_address, group_id):
+        if from_mpe:
+            return self.get_last_open_channel(account, payment_address, group_id)
+        else:
+            return self._get_newly_opened_channel(receipt, account, payment_address, group_id)
+
+    def deposit_and_open_channel(self, account, amount, expiration, payment_address, group_id, from_mpe=False):
         receipt = self.mpe_contract.deposit_and_open_channel(account, payment_address, group_id, amount,
                                                              expiration)
-        return self._get_newly_opened_channel(receipt, account, payment_address, group_id)
+        if from_mpe:
+            return self.get_last_open_channel(account, payment_address, group_id)
+        else:
+            return self._get_newly_opened_channel(receipt, account, payment_address, group_id)
 
     def _get_newly_opened_channel(self, receipt,account, payment_address, group_id):
         open_channels = self.get_past_open_channels(account, payment_address, group_id, receipt["blockNumber"],
